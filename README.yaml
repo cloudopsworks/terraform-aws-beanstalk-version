@@ -1,4 +1,4 @@
-name: <project name>
+name: Terraorm AWS Beanstalk Version Generator
 
 #logo: logo/logo.jpg
 
@@ -9,11 +9,12 @@ copyrights:
     url: "https://cloudops.works"
     year: "2021"
 
-github_repo: <owner/repo>
+github_repo: cloudopsworks/terraform-aws-beanstalk-version
 
 
 description: |-
-  <description>.
+  This module can create Packages and upload to Elastic Beanstalk Bucket and generates new version.
+  It preserves the versions uploaded to S3.
 
 # Introduction to the project
 #introduction: |-
@@ -28,11 +29,11 @@ description: |-
 # How to get started quickly
 #quickstart: |-
 
-# Uncomment to include terraform generated docs (optional)
-#include:
-#  - "docs/targets.md"
-#  - "docs/terraform.md"
+#Uncomment to include terraform generated docs (optional)
+include:
+ - "docs/targets.md"
+ - "docs/terraform.md"
 
 contributors:
-  - name: "<contributor name>"
-    github: "<github id>"
+  - name: "Cristian Beraha"
+    github: "berahac"
