@@ -9,6 +9,10 @@ locals {
   version_label    = "${var.release_name}-${var.source_version}-${var.namespace}-${upper(substr(local.config_file_sha, 0, 10))}"
   download_java    = length(regexall("(?i:.*java.*|.*corretto.*)", lower(var.solution_stack))) > 0 && !var.force_source_compressed
   download_package = length(regexall("(?i:.*java.*|.*corretto.*)", lower(var.solution_stack))) <= 0 || var.force_source_compressed
+  is_tar           = (var.source_compressed_type == "tar")
+  is_tarz          = length(regexall("(?i:tar.z|tz)", var.source_compressed_type)) > 0
+  is_targz         = length(regexall("(?i:tar.gz|tgz)", var.source_compressed_type)) > 0
+  is_tarbz         = length(regexall("(?i:tar.bz|tar.bz2|tbz|tbz2)", var.source_compressed_type)) > 0
 }
 
 resource "aws_elastic_beanstalk_application_version" "app_version" {
@@ -174,7 +178,7 @@ resource "null_resource" "uncompress_zip" {
 }
 
 resource "null_resource" "uncompress_tar" {
-  count = local.download_package && (var.source_compressed_type == "tar") ? 1 : 0
+  count = local.download_package && local.is_tar ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download
@@ -198,7 +202,7 @@ resource "null_resource" "uncompress_tar" {
 }
 
 resource "null_resource" "uncompress_tar_z" {
-  count = (local.download_package && regexall("(?i:tar.z|tz)", var.source_compressed_type) > 0) ? 1 : 0
+  count = (local.download_package && local.is_tarz) ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download
@@ -222,7 +226,7 @@ resource "null_resource" "uncompress_tar_z" {
 }
 
 resource "null_resource" "uncompress_tar_gz" {
-  count = (local.download_package && regexall("(?i:tar.gz|tgz)", var.source_compressed_type) > 0) ? 1 : 0
+  count = (local.download_package && local.is_targz) ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download
@@ -246,7 +250,7 @@ resource "null_resource" "uncompress_tar_gz" {
 }
 
 resource "null_resource" "uncompress_tar_bz" {
-  count = (local.download_package && regexall("(?i:tar.bz|tar.bz2|tbz|tbz2)", var.source_compressed_type) > 0) ? 1 : 0
+  count = (local.download_package && local.is_tarbz) ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download

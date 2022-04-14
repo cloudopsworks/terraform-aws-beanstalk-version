@@ -50,7 +50,7 @@ locals {
 resource "null_resource" "awscli_program" {
   depends_on = [
     null_resource.build_package,
-    null_resource.release_download_zip,
+    null_resource.release_download,
     null_resource.release_download_java,
     null_resource.release_conf_copy_node,
     null_resource.release_conf_copy,
