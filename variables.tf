@@ -37,5 +37,22 @@ variable "application_versions_bucket" {
 }
 
 variable "beanstalk_application" {
-  type = string
+  type        = string
+  description = "(Required) Elastic Beanstalk Application Name, should already exist."
+}
+
+variable "force_source_compressed" {
+  type        = bool
+  default     = false
+  description = "(Optional) Forces that source file should be downloaded as zip file or tar file"
+}
+
+variable "source_compressed_type" {
+  type        = string
+  default     = "zip"
+  description = "(Optional) Indicates the type of the source package to proceed with its de-compression."
+  validation {
+    condition     = can(regex("(?i:zip|tar|tar.gz|tgz|tar.bz|tar.bz2|tbz|tbz2|tar.z)", var.source_compressed_type))
+    error_message = "Error, file types should be one of: zip, tar, tar.gz, tgz, tar.bz, tar.bz2, tar.z or tar.Z, please set the correct type."
+  }
 }
