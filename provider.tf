@@ -3,9 +3,10 @@
 #            On GitHub: https://github.com/cloudopsworks
 #            Distributed Under Apache v2.0 License
 #
-terraform {
-  experiments = [module_variable_optional_attrs]
-}
+# Commented Out : Not Used
+# terraform {
+#   experiments = [module_variable_optional_attrs]
+# }
 
 # provider "aws" {
 #   region = var.region
