@@ -1,3 +1,8 @@
+##
+# (c) 2022 - Cloud Ops Works LLC - https://cloudops.works/
+#            On GitHub: https://github.com/cloudopsworks
+#            Distributed Under Apache v2.0 License
+#
 SHELL := /bin/bash
 
 # List of targets the `readme` target should call before generating the readme

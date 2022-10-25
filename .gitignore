@@ -32,3 +32,7 @@ override.tf.json
 .tronador
 tronador/
 .terraform.lock.hcl
+
+## Idea
+.idea/
+*.iml
