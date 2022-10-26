@@ -4,7 +4,7 @@
 #            Distributed Under Apache v2.0 License
 #
 locals {
-  bucket_path      = var.bluegreen_identifier == "" ? "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}.zip" : "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}--${var.bluegreen_identifier}.zip"
+  bucket_path      = var.bluegreen_identifier == "" ? "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}.zip" : "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${var.bluegreen_identifier}.zip"
   config_file_sha  = sha1(join("", [for f in fileset(".", "${path.root}/${var.source_folder}/**") : filesha1(f)]))
   version_label    = var.bluegreen_identifier == "" ? "${var.release_name}-${var.source_version}-${var.namespace}" : "${var.release_name}-${var.source_version}-${var.namespace}-${var.bluegreen_identifier}"
   download_java    = length(regexall("(?i:.*java.*|.*corretto.*)", lower(var.solution_stack))) > 0 && !var.force_source_compressed
