@@ -12,14 +12,14 @@ resource "random_string" "awscli_output_temp_file_name" {
   length  = 16
   special = false
 }
-
-resource "local_file" "awscli_results_file" {
-  depends_on           = [random_string.awscli_output_temp_file_name]
-  filename             = "${path.module}/temp/${random_string.awscli_output_temp_file_name.result}.json"
-  directory_permission = "0777"
-  file_permission      = "0666"
-  content              = ""
-}
+#
+#resource "local_file" "awscli_results_file" {
+#  depends_on           = [random_string.awscli_output_temp_file_name]
+#  filename             = "${path.module}/temp/${random_string.awscli_output_temp_file_name.result}.json"
+#  directory_permission = "0777"
+#  file_permission      = "0666"
+#  content              = ""
+#}
 
 locals {
   assume_role_arn   = var.sts_assume_role
@@ -41,7 +41,7 @@ locals {
     role_session_name  = local.role_session_name
     aws_cli_commands   = join(" ", local.aws_cli_commands)
     aws_cli_query      = local.aws_cli_query
-    output_file        = local_file.awscli_results_file.filename
+    output_file        = "${path.module}/temp/${random_string.awscli_output_temp_file_name.result}.json"
     debug_log_filename = local.debug_log_filename
     aws_region         = var.region
   }
@@ -53,8 +53,8 @@ resource "null_resource" "awscli_program" {
     null_resource.release_download,
     null_resource.release_download_java,
     null_resource.release_conf_copy_node,
-    null_resource.release_conf_copy,
-    local_file.awscli_results_file
+    null_resource.release_conf_copy
+    # local_file.awscli_results_file
     # data.archive_file.build_package
   ]
   triggers = {
