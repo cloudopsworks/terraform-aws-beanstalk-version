@@ -63,6 +63,10 @@ resource "null_resource" "awscli_program" {
   }
 
   provisioner "local-exec" {
+    command = "mkdir -p .terraform/modules/app_version_b/temp"
+  }
+
+  provisioner "local-exec" {
     command = "echo '${jsonencode(local.awscli_query)}' | ${path.module}/scripts/awsWithAssumeRole.sh"
   }
 }
