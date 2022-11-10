@@ -63,7 +63,7 @@ resource "null_resource" "awscli_program" {
   }
 
   provisioner "local-exec" {
-    command = "mkdir -p .terraform/modules/app_version_b/temp"
+    command = "mkdir -p ${path.module}/temp"
   }
 
   provisioner "local-exec" {
