@@ -134,6 +134,10 @@ resource "null_resource" "release_download_java" {
   provisioner "local-exec" {
     command = "${path.module}/scripts/github-asset.sh ${var.repository_owner} ${var.source_name} v${var.source_version} ${var.source_name}-${var.source_version}.jar .work/${var.release_name}/build/app.jar"
   }
+
+  provisioner "local-exec" {
+    command = "chmod +x .work/${var.release_name}/build/app.jar"
+  }
 }
 
 resource "null_resource" "release_download" {
