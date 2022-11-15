@@ -73,7 +73,12 @@ resource "null_resource" "release_conf_copy" {
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download_java,
-    null_resource.release_download
+    null_resource.release_download,
+    null_resource.uncompress_zip,
+    null_resource.uncompress_tar,
+    null_resource.uncompress_tar_bz,
+    null_resource.uncompress_tar_gz,
+    null_resource.uncompress_tar_z,
   ]
 
   triggers = {
@@ -105,7 +110,12 @@ resource "null_resource" "release_conf_copy" {
 resource "null_resource" "release_conf_copy_node" {
   depends_on = [
     null_resource.release_pre,
-    null_resource.release_download
+    null_resource.release_download,
+    null_resource.uncompress_zip,
+    null_resource.uncompress_tar,
+    null_resource.uncompress_tar_bz,
+    null_resource.uncompress_tar_gz,
+    null_resource.uncompress_tar_z,
   ]
   count = length(regexall("(?i:.*node.*)", lower(var.solution_stack))) > 0 ? 1 : 0
 
