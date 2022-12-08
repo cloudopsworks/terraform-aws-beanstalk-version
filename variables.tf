@@ -64,7 +64,12 @@ variable "bluegreen_identifier" {
   nullable    = false
 }
 
-variable "source_folder" {
+variable "config_source_folder" {
   type        = string
   description = "(required) Location [root relative] of the configuration source."
+}
+
+variable "config_hash_file" {
+  type        = string
+  description = "(required) Hashfile location to track source "
 }

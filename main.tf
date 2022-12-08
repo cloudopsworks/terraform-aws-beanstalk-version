@@ -4,9 +4,10 @@
 #            Distributed Under Apache v2.0 License
 #
 locals {
-  bucket_path      = var.bluegreen_identifier == "" ? "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}.zip" : "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${var.bluegreen_identifier}.zip"
-  config_file_sha  = sha1(join("", [for f in fileset(".", "${path.root}/${var.source_folder}/**") : filesha1(f)]))
-  version_label    = var.bluegreen_identifier == "" ? "${var.release_name}-${var.source_version}-${var.namespace}" : "${var.release_name}-${var.source_version}-${var.namespace}-${var.bluegreen_identifier}"
+  #config_file_sha  = sha1(join("", [for f in fileset(".", "${path.root}/${var.config_source_folder}/**") : filesha1(f)]))
+  config_file_sha  = substr(split(" ", data.local_file.config_hash_file.content)[0], 0, 10)
+  bucket_path      = var.bluegreen_identifier == "" ? "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}.zip" : "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}-${var.bluegreen_identifier}.zip"
+  version_label    = var.bluegreen_identifier == "" ? "${var.release_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}" : "${var.release_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}-${var.bluegreen_identifier}"
   download_java    = length(regexall("(?i:.*java.*|.*corretto.*)", lower(var.solution_stack))) > 0 && !var.force_source_compressed
   download_package = length(regexall("(?i:.*java.*|.*corretto.*)", lower(var.solution_stack))) <= 0 || var.force_source_compressed
   is_tar           = (var.source_compressed_type == "tar")
@@ -19,12 +20,17 @@ resource "aws_elastic_beanstalk_application_version" "app_version" {
   depends_on = [
     null_resource.awscli_program
   ]
+
   name         = local.version_label
   application  = data.aws_elastic_beanstalk_application.application.name
-  description  = "Application ${var.source_name} v${var.source_version} for ${var.namespace} Environment"
+  description  = "Application ${var.source_name} v${var.source_version} for ${var.namespace} Environment, Config SHA: ${local.config_file_sha}"
   force_delete = false
   bucket       = data.aws_s3_bucket.version_bucket.id
   key          = local.bucket_path
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 data "aws_s3_bucket" "version_bucket" {
@@ -89,17 +95,17 @@ resource "null_resource" "release_conf_copy" {
   }
 
   provisioner "local-exec" {
-    command = "cp -pr ${path.root}/${var.source_folder}/* ${path.root}/.work/${var.release_name}/build/"
+    command = "cp -pr ${path.root}/${var.config_source_folder}/* ${path.root}/.work/${var.release_name}/build/"
   }
 
   # EB extensions
   provisioner "local-exec" {
-    command = "${path.module}/scripts/check_copy.sh ${path.root}/${var.source_folder}/.ebextensions ${path.root}/.work/${var.release_name}/build/"
+    command = "${path.module}/scripts/check_copy.sh ${path.root}/${var.config_source_folder}/.ebextensions ${path.root}/.work/${var.release_name}/build/"
   }
 
   # EB platform
   provisioner "local-exec" {
-    command = "${path.module}/scripts/check_copy.sh  ${path.root}/${var.source_folder}/.platform ${path.root}/.work/${var.release_name}/build/"
+    command = "${path.module}/scripts/check_copy.sh  ${path.root}/${var.config_source_folder}/.platform ${path.root}/.work/${var.release_name}/build/"
   }
 
 
@@ -126,7 +132,7 @@ resource "null_resource" "release_conf_copy_node" {
   }
 
   provisioner "local-exec" {
-    command = "cp -pr ${path.root}/${var.source_folder}/.env ${path.root}/.work/${var.release_name}/build/"
+    command = "cp -pr ${path.root}/${var.config_source_folder}/.env ${path.root}/.work/${var.release_name}/build/"
   }
 }
 
