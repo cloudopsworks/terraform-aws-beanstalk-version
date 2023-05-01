@@ -33,7 +33,7 @@ resource "aws_elastic_beanstalk_application_version" "app_version" {
   }
 
   tags = merge(var.extra_tags, {
-    Namespace = var.namespace
+    Namespace   = var.namespace
     Application = var.source_name
     Version     = var.source_version
     ConfigSHA   = local.config_file_sha
