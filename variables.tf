@@ -73,3 +73,9 @@ variable "config_hash_file" {
   type        = string
   description = "(required) Hashfile location to track source "
 }
+
+variable "extra_tags" {
+  type        = map(string)
+  description = "(optional) Extra tags to be added to the resources"
+  default     = {}
+}

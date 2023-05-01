@@ -31,6 +31,13 @@ resource "aws_elastic_beanstalk_application_version" "app_version" {
   lifecycle {
     create_before_destroy = true
   }
+
+  tags = merge(var.extra_tags, {
+    Namespace = var.namespace
+    Application = var.source_name
+    Version     = var.source_version
+    ConfigSHA   = local.config_file_sha
+  })
 }
 
 data "aws_s3_bucket" "version_bucket" {
