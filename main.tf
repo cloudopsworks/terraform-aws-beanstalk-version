@@ -5,7 +5,7 @@
 #
 locals {
   #config_file_sha  = sha1(join("", [for f in fileset(".", "${path.root}/${var.config_source_folder}/**") : filesha1(f)]))
-  config_file_sha  = upper(substr(split(" ", data.local_file.config_hash_file.content)[0], 0, 10))
+  config_file_sha  = upper(substr(split(" ", file(var.config_hash_file))[0], 0, 10))
   bucket_path      = var.bluegreen_identifier == "" ? "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}.zip" : "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}-${var.bluegreen_identifier}.zip"
   version_label    = var.bluegreen_identifier == "" ? "${var.release_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}" : "${var.release_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}-${var.bluegreen_identifier}"
   download_java    = length(regexall("(?i:.*java.*|.*corretto.*)", lower(var.solution_stack))) > 0 && !var.force_source_compressed
