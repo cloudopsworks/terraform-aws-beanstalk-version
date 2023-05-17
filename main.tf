@@ -25,7 +25,7 @@ resource "aws_elastic_beanstalk_application_version" "app_version" {
   application  = data.aws_elastic_beanstalk_application.application.name
   description  = "Application ${var.source_name} v${var.source_version} for ${var.namespace} Environment, Config SHA: ${local.config_file_sha}"
   force_delete = false
-  bucket       = data.aws_s3_bucket.version_bucket.id
+  bucket       = var.application_versions_bucket
   key          = local.bucket_path
 
   lifecycle {
@@ -38,10 +38,6 @@ resource "aws_elastic_beanstalk_application_version" "app_version" {
     Version     = var.source_version
     ConfigSHA   = local.config_file_sha
   })
-}
-
-data "aws_s3_bucket" "version_bucket" {
-  bucket = var.application_versions_bucket
 }
 
 resource "null_resource" "build_package" {

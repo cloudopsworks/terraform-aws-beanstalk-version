@@ -28,7 +28,7 @@ locals {
     "s3",
     "cp",
     "${path.root}/.work/${var.release_name}/target/package.zip",
-    "s3://${data.aws_s3_bucket.version_bucket.id}/${local.bucket_path}",
+    "s3://${var.application_versions_bucket}/${local.bucket_path}",
     "--quiet",
     "--region",
     "${var.region}"
