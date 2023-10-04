@@ -81,19 +81,19 @@ variable "extra_tags" {
 }
 
 variable "github_package" {
-  type= bool
+  type        = bool
   description = "(optional) Indicates if the source is a github package"
-  default = false
+  default     = false
 }
 
 variable "package_name" {
-  type= string
+  type        = string
   description = "(optional) Name of the package."
-  default = ""
+  default     = ""
 }
 
 variable "package_type" {
-  type= string
+  type        = string
   description = "(optional) Type of the package from github (MAVEN,NPM,DOCKER,NET)"
-  default = ""
+  default     = ""
 }
