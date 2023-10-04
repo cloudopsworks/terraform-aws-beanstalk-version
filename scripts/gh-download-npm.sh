@@ -10,7 +10,7 @@ CWD="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
 
 # Check dependencies.
 set -e
-type curl grep sed tr gh npm node >&2
+type curl grep sed tr gh npm node yq >&2
 xargs=$(which gxargs || which xargs)
 
 # Validate settings.
@@ -30,5 +30,8 @@ echo "${registry}:registry=https://npm.pkg.github.com/" >> $HOME/.npmrc
 
 # Download asset file.
 echo "Downloading asset..." >&2
-npm pack ${package_name}@${version} --pack-destination $name
+DEST_DIR=$(dirname $name)
+FNAME=$(npm pack ${package_name}@${version} --pack-destination $DEST_DIR --json | yq '.[].filename')
+echo "Moving $DEST_DIR/$FNAME to $name"
+mv $DEST_DIR/$FNAME $name
 echo "$0 done." >&2
