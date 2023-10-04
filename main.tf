@@ -49,6 +49,8 @@ resource "null_resource" "build_package" {
     null_resource.uncompress_tar_bz,
     null_resource.uncompress_tar_gz,
     null_resource.release_download_java,
+    null_resource.release_download_gh_java,
+    null_resource.release_download_gh_node,
     null_resource.release_conf_copy_node,
     null_resource.release_conf_copy
   ]
@@ -83,6 +85,8 @@ resource "null_resource" "release_conf_copy" {
     null_resource.release_pre,
     null_resource.release_download_java,
     null_resource.release_download,
+    null_resource.release_download_gh_node,
+    null_resource.release_download_gh_java,
     null_resource.uncompress_zip,
     null_resource.uncompress_tar,
     null_resource.uncompress_tar_bz,
@@ -121,6 +125,7 @@ resource "null_resource" "release_conf_copy_node" {
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download,
+    null_resource.release_download_gh_node,
     null_resource.uncompress_zip,
     null_resource.uncompress_tar,
     null_resource.uncompress_tar_bz,
@@ -140,7 +145,7 @@ resource "null_resource" "release_conf_copy_node" {
 }
 
 resource "null_resource" "release_download_java" {
-  count = local.download_java ? 1 : 0
+  count = local.download_java && !var.github_package ? 1 : 0
   depends_on = [
     null_resource.release_pre
   ]
@@ -161,7 +166,7 @@ resource "null_resource" "release_download_java" {
 }
 
 resource "null_resource" "release_download" {
-  count = local.download_package ? 1 : 0
+  count = local.download_package && !var.github_package ? 1 : 0
   depends_on = [
     null_resource.release_pre
   ]
@@ -178,7 +183,7 @@ resource "null_resource" "release_download" {
 }
 
 resource "null_resource" "uncompress_zip" {
-  count = local.download_package && (var.source_compressed_type == "zip") ? 1 : 0
+  count = local.download_package && !var.github_package && (var.source_compressed_type == "zip") ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download
@@ -202,7 +207,7 @@ resource "null_resource" "uncompress_zip" {
 }
 
 resource "null_resource" "uncompress_tar" {
-  count = local.download_package && local.is_tar ? 1 : 0
+  count = local.download_package && local.is_tar && !var.github_package ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download
@@ -226,7 +231,7 @@ resource "null_resource" "uncompress_tar" {
 }
 
 resource "null_resource" "uncompress_tar_z" {
-  count = (local.download_package && local.is_tarz) ? 1 : 0
+  count = (local.download_package && local.is_tarz && !var.github_package) ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download
@@ -250,7 +255,7 @@ resource "null_resource" "uncompress_tar_z" {
 }
 
 resource "null_resource" "uncompress_tar_gz" {
-  count = (local.download_package && local.is_targz) ? 1 : 0
+  count = (local.download_package && local.is_targz && !var.github_package) ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download
@@ -274,7 +279,7 @@ resource "null_resource" "uncompress_tar_gz" {
 }
 
 resource "null_resource" "uncompress_tar_bz" {
-  count = (local.download_package && local.is_tarbz) ? 1 : 0
+  count = (local.download_package && local.is_tarbz && !var.github_package) ? 1 : 0
   depends_on = [
     null_resource.release_pre,
     null_resource.release_download

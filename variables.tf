@@ -79,3 +79,21 @@ variable "extra_tags" {
   description = "(optional) Extra tags to be added to the resources"
   default     = {}
 }
+
+variable "github_package" {
+  type= bool
+  description = "(optional) Indicates if the source is a github package"
+  default = false
+}
+
+variable "package_name" {
+  type= string
+  description = "(optional) Name of the package."
+  default = ""
+}
+
+variable "package_type" {
+  type= string
+  description = "(optional) Type of the package from github (MAVEN,NPM,DOCKER,NET)"
+  default = ""
+}
