@@ -28,6 +28,9 @@ registry=$(echo $package_name | sed -n 's/.*@\(.*\)\/.*/\1/p')
 echo "//npm.pkg.github.com/:_authToken=${GITHUB_API_TOKEN}" >> $HOME/.npmrc
 echo "${registry}:registry=https://npm.pkg.github.com/" >> $HOME/.npmrc
 
+echo "npmrc file content:"
+cat $HOME/.npmrc
+
 # Download asset file.
 echo "Downloading asset..." >&2
 DEST_DIR=$(dirname $name)
