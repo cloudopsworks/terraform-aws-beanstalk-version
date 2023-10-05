@@ -40,10 +40,6 @@ resource "null_resource" "release_download_gh_node" {
     command = "${path.module}/scripts/gh-download-npm.sh ${var.repository_owner} ${var.source_name} ${var.source_version} ${var.package_name} ${var.package_type} .work/${var.release_name}/build/source-app.tgz"
   }
 
-  provisioner "local-exec" {
-    command = "chmod +x .work/${var.release_name}/build/app.jar"
-  }
-
   # Unpack the tarball strip the top level directory: package/
   provisioner "local-exec" {
     command     = "tar --strip-components=1 -zxf source-app.tgz"
