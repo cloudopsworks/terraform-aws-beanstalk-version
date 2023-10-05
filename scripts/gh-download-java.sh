@@ -22,6 +22,8 @@ read owner repo version package_name package_type name <<<$@
 
 CURL_ARGS="-LJ"
 
+export GH_TOKEN=$GITHUB_API_TOKEN
+
 package_url=$(gh api graphql -F owner=$owner -F repo=$repo \
 -F packageType=$package_type -F names="$package_name" \
 -F version="2.9.0" -F query='
