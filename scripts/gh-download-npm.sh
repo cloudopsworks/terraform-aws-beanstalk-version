@@ -25,8 +25,8 @@ CURL_ARGS="-LJ"
 #obtain registry form the pattern of package name @registry/package_name
 registry=$(echo $package_name | sed -n 's/^\(.*\)\/.*/\1/p')
 
-echo "//npm.pkg.github.com/:_authToken=${GITHUB_API_TOKEN}" >> .npmrc
-echo "${registry}:registry=https://npm.pkg.github.com/" >> .npmrc
+echo "//npm.pkg.github.com/:_authToken=${GITHUB_API_TOKEN}" >> $HOME/.npmrc
+echo "${registry}:registry=https://npm.pkg.github.com/" >> $HOME/.npmrc
 
 # Download asset file.
 echo "Downloading asset..." >&2
