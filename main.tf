@@ -140,7 +140,7 @@ resource "null_resource" "release_conf_copy_node" {
   }
 
   provisioner "local-exec" {
-    command = "[ -f ${path.root}/${var.config_source_folder}/.env  ] && cp -pr ${path.root}/${var.config_source_folder}/.env ${path.root}/.work/${var.release_name}/build/"
+    command = "cp -pr ${path.root}/${var.config_source_folder}/.env ${path.root}/.work/${var.release_name}/build/"
   }
 }
 
