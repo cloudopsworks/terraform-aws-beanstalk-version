@@ -102,7 +102,7 @@ resource "null_resource" "release_conf_copy" {
   }
 
   provisioner "local-exec" {
-    command = "cp -pr ${path.root}/${var.config_source_folder}/. ${path.root}/.work/${var.release_name}/build/"
+    command = "cp -pfr ${path.root}/${var.config_source_folder}/. ${path.root}/.work/${var.release_name}/build/"
   }
 
   # EB extensions
