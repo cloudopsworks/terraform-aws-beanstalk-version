@@ -97,3 +97,9 @@ variable "package_type" {
   description = "(optional) Type of the package from github (MAVEN,NPM,DOCKER,NET)"
   default     = ""
 }
+
+variable "extra_run_command" {
+  type        = string
+  description = "(optional) Extra commands to run during package preparation."
+  default = ""
+}

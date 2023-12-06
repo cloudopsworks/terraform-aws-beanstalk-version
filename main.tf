@@ -52,7 +52,8 @@ resource "null_resource" "build_package" {
     null_resource.release_download_gh_java,
     null_resource.release_download_gh_node,
     null_resource.release_conf_copy_node,
-    null_resource.release_conf_copy
+    null_resource.release_conf_copy,
+    null_resource.release_extra_build
   ]
   triggers = {
     dir_sha1 = local.config_file_sha
@@ -299,5 +300,33 @@ resource "null_resource" "uncompress_tar_bz" {
   provisioner "local-exec" {
     command     = "rm -f source-app.${var.source_compressed_type}"
     working_dir = "${path.root}/.work/${var.release_name}/build/"
+  }
+}
+
+resource "null_resource" "release_extra_build" {
+  count = var.extra_run_command != "" ? 1 : 0
+  depends_on = [
+    null_resource.release_download,
+    null_resource.uncompress_tar,
+    null_resource.uncompress_zip,
+    null_resource.uncompress_tar_z,
+    null_resource.uncompress_tar_bz,
+    null_resource.uncompress_tar_gz,
+    null_resource.release_download_java,
+    null_resource.release_download_gh_java,
+    null_resource.release_download_gh_node,
+    null_resource.release_conf_copy_node,
+    null_resource.release_conf_copy,
+  ]
+
+  triggers = {
+    dir_sha1 = local.config_file_sha
+    version  = var.source_version
+    #always_run = "${timestamp()}"
+  }
+
+  provisioner "local-exec" {
+      command     = var.extra_run_command
+      working_dir = "${path.root}/.work/${var.release_name}/build/"
   }
 }
