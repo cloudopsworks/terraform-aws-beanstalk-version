@@ -26,7 +26,7 @@ export GH_TOKEN=$GITHUB_API_TOKEN
 
 package_url=$(gh api graphql -F owner=$owner -F repo=$repo \
 -F packageType=$package_type -F names="$package_name" \
--F version="2.9.0" -F query='
+-F version="$version" -F query='
 query($owner: String!, $repo: String!, $packageType: PackageType!, $names: [String!], $version: String!) {
   repository(owner: $owner, name: $repo) {
     packages(first: 10, packageType: $packageType, names: $names) {
