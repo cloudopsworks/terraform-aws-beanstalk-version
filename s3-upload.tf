@@ -27,7 +27,7 @@ locals {
   aws_cli_commands = [
     "s3",
     "cp",
-    "${path.root}/.work/${var.release_name}/target/package.zip",
+    "${path.root}/.work/${var.release_name}/${local.target_folder}/package.zip",
     "s3://${var.application_versions_bucket}/${local.bucket_path}",
     "--quiet",
     "--region",
