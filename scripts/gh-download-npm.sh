@@ -31,7 +31,8 @@ echo "${registry}:registry=https://npm.pkg.github.com/" >> $HOME/.npmrc
 # Download asset file.
 echo "Downloading asset..." >&2
 DEST_DIR=$(dirname $name)
-FNAME=$(npm pack ${package_name}@${version} --pack-destination $DEST_DIR --json | yq '.[].filename')
+ANAME=$(npm pack ${package_name}@${version} --pack-destination $DEST_DIR --json | yq '.[].filename')
+FNAME=$(echo "$ANAME" | tr -d '@' | tr '/' '-')
 echo "Moving $DEST_DIR/$FNAME to $name"
 mv $DEST_DIR/$FNAME $name
 echo "$0 done." >&2
