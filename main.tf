@@ -95,7 +95,7 @@ resource "null_resource" "release_conf_copy" {
     null_resource.uncompress_tar_bz,
     null_resource.uncompress_tar_gz,
     null_resource.uncompress_tar_z,
-
+    null_resource.release_conf_copy_node,
   ]
 
   triggers = {
