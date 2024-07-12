@@ -4,7 +4,7 @@
 #            Distributed Under Apache v2.0 License
 #
 locals {
-  #config_file_sha  = sha1(join("", [for f in fileset(".", "${path.root}/${var.config_source_folder}/**") : filesha1(f)]))
+  #config_file_sha  = sha1(join("", [for f in fileset(".", "${local.root_path}${var.config_source_folder}/**") : filesha1(f)]))
   config_file_sha  = upper(substr(split(" ", file("${path.root}/${var.config_hash_file}"))[0], 0, 10))
   bucket_path      = var.bluegreen_identifier == "" ? "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}.zip" : "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}-${var.bluegreen_identifier}.zip"
   version_label    = var.bluegreen_identifier == "" ? "${var.release_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}" : "${var.release_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}-${var.bluegreen_identifier}"
@@ -16,6 +16,7 @@ locals {
   is_tarbz         = length(regexall("(?i:tar.bz|tar.bz2|tbz|tbz2)", var.source_compressed_type)) > 0
   build_folder     = var.bluegreen_identifier == "" ? "build" : "build-${var.bluegreen_identifier}"
   target_folder    = var.bluegreen_identifier == "" ? "target" : "target-${var.bluegreen_identifier}"
+  root_path        = startswith(var.config_source_folder, "/") ? "" : "${path.root}/"
 }
 
 resource "aws_elastic_beanstalk_application_version" "app_version" {
@@ -105,17 +106,17 @@ resource "null_resource" "release_conf_copy" {
   }
 
   provisioner "local-exec" {
-    command = "cp -pfr ${path.root}/${var.config_source_folder}/. ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "cp -pfr ${local.root_path}${var.config_source_folder}/. ${path.root}/.work/${var.release_name}/${local.build_folder}/"
   }
 
   # EB extensions
   provisioner "local-exec" {
-    command = "${path.module}/scripts/check_copy.sh ${path.root}/${var.config_source_folder}/.ebextensions ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "${path.module}/scripts/check_copy.sh ${local.root_path}${var.config_source_folder}/.ebextensions ${path.root}/.work/${var.release_name}/${local.build_folder}/"
   }
 
   # EB platform
   provisioner "local-exec" {
-    command = "${path.module}/scripts/check_copy.sh  ${path.root}/${var.config_source_folder}/.platform ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "${path.module}/scripts/check_copy.sh  ${local.root_path}${var.config_source_folder}/.platform ${path.root}/.work/${var.release_name}/${local.build_folder}/"
   }
 
 
@@ -143,7 +144,7 @@ resource "null_resource" "release_conf_copy_node" {
   }
 
   provisioner "local-exec" {
-    command = "cp -pr ${path.root}/${var.config_source_folder}/.env ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "cp -pr ${local.root_path}${var.config_source_folder}/.env ${path.root}/.work/${var.release_name}/${local.build_folder}/"
   }
 }
 
