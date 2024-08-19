@@ -4,6 +4,7 @@
 #            Distributed Under Apache v2.0 License
 #
 locals {
+  tmp_dir = "/tmp/${uuid()}/work"
   #config_file_sha  = sha1(join("", [for f in fileset(".", "${local.root_path}${var.config_source_folder}/**") : filesha1(f)]))
   config_file_sha  = upper(substr(split(" ", file("${local.root_path}${var.config_hash_file}"))[0], 0, 10))
   bucket_path      = var.bluegreen_identifier == "" ? "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}.zip" : "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}-${var.bluegreen_identifier}.zip"
@@ -66,7 +67,7 @@ resource "null_resource" "build_package" {
 
   provisioner "local-exec" {
     command     = "zip -rqy ../${local.target_folder}/package.zip ."
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}"
   }
 }
 
@@ -76,11 +77,11 @@ resource "null_resource" "release_pre" {
   }
 
   provisioner "local-exec" {
-    command = "mkdir -p ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "mkdir -p ${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
   provisioner "local-exec" {
-    command = "mkdir -p ${path.root}/.work/${var.release_name}/${local.target_folder}/"
+    command = "mkdir -p ${local.tmp_dir}/${var.release_name}/${local.target_folder}/"
   }
 }
 
@@ -106,22 +107,22 @@ resource "null_resource" "release_conf_copy" {
   }
 
   provisioner "local-exec" {
-    command = "cp -pfr ${local.root_path}${var.config_source_folder}/. ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "cp -pfr ${local.root_path}${var.config_source_folder}/. ${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
   # EB extensions
   provisioner "local-exec" {
-    command = "${path.module}/scripts/check_copy.sh ${local.root_path}${var.config_source_folder}/.ebextensions ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "${path.module}/scripts/check_copy.sh ${local.root_path}${var.config_source_folder}/.ebextensions ${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
   # EB platform
   provisioner "local-exec" {
-    command = "${path.module}/scripts/check_copy.sh  ${local.root_path}${var.config_source_folder}/.platform ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "${path.module}/scripts/check_copy.sh  ${local.root_path}${var.config_source_folder}/.platform ${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
 
   provisioner "local-exec" {
-    command = "echo \"Release: ${var.source_name} v${var.source_version} - Environment: ${var.release_name} / ${var.namespace}\" > .work/${var.release_name}/${local.build_folder}/VERSION"
+    command = "echo \"Release: ${var.source_name} v${var.source_version} - Environment: ${var.release_name} / ${var.namespace}\" > ${local.tmp_dir}/${var.release_name}/${local.build_folder}/VERSION"
   }
 }
 
@@ -144,7 +145,7 @@ resource "null_resource" "release_conf_copy_node" {
   }
 
   provisioner "local-exec" {
-    command = "cp -pr ${local.root_path}${var.config_source_folder}/.env ${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command = "cp -pr ${local.root_path}${var.config_source_folder}/.env ${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 }
 
@@ -161,11 +162,11 @@ resource "null_resource" "release_download_java" {
   }
 
   provisioner "local-exec" {
-    command = "${path.module}/scripts/github-asset.sh ${var.repository_owner} ${var.source_name} v${var.source_version} ${var.source_name}-${var.source_version}.jar .work/${var.release_name}/${local.build_folder}/app.jar"
+    command = "${path.module}/scripts/github-asset.sh ${var.repository_owner} ${var.source_name} v${var.source_version} ${var.source_name}-${var.source_version}.jar ${local.tmp_dir}/${var.release_name}/${local.build_folder}/app.jar"
   }
 
   provisioner "local-exec" {
-    command = "chmod +x .work/${var.release_name}/${local.build_folder}/app.jar"
+    command = "chmod +x ${local.tmp_dir}/${var.release_name}/${local.build_folder}/app.jar"
   }
 }
 
@@ -182,7 +183,7 @@ resource "null_resource" "release_download" {
   }
 
   provisioner "local-exec" {
-    command = "${path.module}/scripts/github-asset.sh ${var.repository_owner} ${var.source_name} v${var.source_version} ${var.source_name}-${var.source_version}.${var.source_compressed_type} ${path.root}/.work/${var.release_name}/${local.build_folder}/source-app.zip"
+    command = "${path.module}/scripts/github-asset.sh ${var.repository_owner} ${var.source_name} v${var.source_version} ${var.source_name}-${var.source_version}.${var.source_compressed_type} ${local.tmp_dir}/${var.release_name}/${local.build_folder}/source-app.zip"
   }
 }
 
@@ -201,12 +202,12 @@ resource "null_resource" "uncompress_zip" {
 
   provisioner "local-exec" {
     command     = "unzip -qoK source-app.zip"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
   provisioner "local-exec" {
     command     = "rm -f source-app.zip"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 }
 
@@ -225,12 +226,12 @@ resource "null_resource" "uncompress_tar" {
 
   provisioner "local-exec" {
     command     = "tar -xf source-app.tar"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
   provisioner "local-exec" {
     command     = "rm -f source-app.tar"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 }
 
@@ -249,12 +250,12 @@ resource "null_resource" "uncompress_tar_z" {
 
   provisioner "local-exec" {
     command     = "tar -Zxf source-app.${var.source_compressed_type}"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
   provisioner "local-exec" {
     command     = "rm -f source-app.${var.source_compressed_type}"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 }
 
@@ -273,12 +274,12 @@ resource "null_resource" "uncompress_tar_gz" {
 
   provisioner "local-exec" {
     command     = "tar -zxf source-app.${var.source_compressed_type}"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
   provisioner "local-exec" {
     command     = "rm -f source-app.${var.source_compressed_type}"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 }
 
@@ -297,12 +298,12 @@ resource "null_resource" "uncompress_tar_bz" {
 
   provisioner "local-exec" {
     command     = "bzip2 -d -c source-app.${var.source_compressed_type} | tar -xf -"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 
   provisioner "local-exec" {
     command     = "rm -f source-app.${var.source_compressed_type}"
-    working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 }
 
@@ -329,7 +330,7 @@ resource "null_resource" "release_extra_build" {
   }
 
   provisioner "local-exec" {
-      command     = var.extra_run_command
-      working_dir = "${path.root}/.work/${var.release_name}/${local.build_folder}/"
+    command     = var.extra_run_command
+    working_dir = "${local.tmp_dir}/${var.release_name}/${local.build_folder}/"
   }
 }

@@ -101,5 +101,5 @@ variable "package_type" {
 variable "extra_run_command" {
   type        = string
   description = "(optional) Extra commands to run during package preparation."
-  default = ""
+  default     = ""
 }
