@@ -30,8 +30,6 @@ echo "${registry}:registry=https://npm.pkg.github.com/" >> $HOME/.npmrc
 
 npm version
 
-npm pack --ignore-scripts ${package_name}@${version} --pack-destination $DEST_DIR --json --dry-run
-
 # Download asset file.
 echo "Downloading asset..." >&2
 DEST_DIR=$(dirname $name)
