@@ -46,15 +46,13 @@ resource "aws_elastic_beanstalk_application_version" "app_version" {
 
 resource "null_resource" "build_package" {
   depends_on = [
-    null_resource.release_download,
+    null_resource.release_copy,
+    null_resource.release_copy_java,
     null_resource.uncompress_tar,
     null_resource.uncompress_zip,
     null_resource.uncompress_tar_z,
     null_resource.uncompress_tar_bz,
     null_resource.uncompress_tar_gz,
-    null_resource.release_download_java,
-    null_resource.release_download_gh_java,
-    null_resource.release_download_gh_node,
     null_resource.release_conf_copy_node,
     null_resource.release_conf_copy,
     null_resource.release_extra_build
@@ -88,10 +86,8 @@ resource "null_resource" "release_pre" {
 resource "null_resource" "release_conf_copy" {
   depends_on = [
     null_resource.release_pre,
-    null_resource.release_download_java,
-    null_resource.release_download,
-    null_resource.release_download_gh_node,
-    null_resource.release_download_gh_java,
+    null_resource.release_copy,
+    null_resource.release_copy_java,
     null_resource.uncompress_zip,
     null_resource.uncompress_tar,
     null_resource.uncompress_tar_bz,
@@ -129,8 +125,7 @@ resource "null_resource" "release_conf_copy" {
 resource "null_resource" "release_conf_copy_node" {
   depends_on = [
     null_resource.release_pre,
-    null_resource.release_download,
-    null_resource.release_download_gh_node,
+    null_resource.release_copy,
     null_resource.uncompress_zip,
     null_resource.uncompress_tar,
     null_resource.uncompress_tar_bz,
@@ -149,8 +144,8 @@ resource "null_resource" "release_conf_copy_node" {
   }
 }
 
-resource "null_resource" "release_download_java" {
-  count = local.download_java && !var.github_package ? 1 : 0
+resource "null_resource" "release_copy_java" {
+  count = local.download_java ? 1 : 0
   depends_on = [
     null_resource.release_pre
   ]
@@ -162,7 +157,7 @@ resource "null_resource" "release_download_java" {
   }
 
   provisioner "local-exec" {
-    command = "${path.module}/scripts/github-asset.sh ${var.repository_owner} ${var.source_name} v${var.source_version} ${var.source_name}-${var.source_version}.jar ${local.tmp_dir}/${var.release_name}/${local.build_folder}/app.jar"
+    command = "cp -v ${var.release_folder}/${var.source_name}-${var.source_version}.jar ${local.tmp_dir}/${var.release_name}/${local.build_folder}/app.jar"
   }
 
   provisioner "local-exec" {
@@ -170,8 +165,8 @@ resource "null_resource" "release_download_java" {
   }
 }
 
-resource "null_resource" "release_download" {
-  count = local.download_package && !var.github_package ? 1 : 0
+resource "null_resource" "release_copy" {
+  count = local.download_package ? 1 : 0
   depends_on = [
     null_resource.release_pre
   ]
@@ -183,15 +178,15 @@ resource "null_resource" "release_download" {
   }
 
   provisioner "local-exec" {
-    command = "${path.module}/scripts/github-asset.sh ${var.repository_owner} ${var.source_name} v${var.source_version} ${var.source_name}-${var.source_version}.${var.source_compressed_type} ${local.tmp_dir}/${var.release_name}/${local.build_folder}/source-app.zip"
+    command = "cp -v ${var.release_folder}/${var.source_name}-${var.source_version}.${var.source_compressed_type} ${local.tmp_dir}/${var.release_name}/${local.build_folder}/source-app.${var.source_compressed_type}"
   }
 }
 
 resource "null_resource" "uncompress_zip" {
-  count = local.download_package && !var.github_package && (var.source_compressed_type == "zip") ? 1 : 0
+  count = local.download_package && (var.source_compressed_type == "zip") ? 1 : 0
   depends_on = [
     null_resource.release_pre,
-    null_resource.release_download
+    null_resource.release_copy
   ]
 
   triggers = {
@@ -212,10 +207,10 @@ resource "null_resource" "uncompress_zip" {
 }
 
 resource "null_resource" "uncompress_tar" {
-  count = local.download_package && local.is_tar && !var.github_package ? 1 : 0
+  count = local.download_package && local.is_tar ? 1 : 0
   depends_on = [
     null_resource.release_pre,
-    null_resource.release_download
+    null_resource.release_copy
   ]
 
   triggers = {
@@ -236,10 +231,10 @@ resource "null_resource" "uncompress_tar" {
 }
 
 resource "null_resource" "uncompress_tar_z" {
-  count = (local.download_package && local.is_tarz && !var.github_package) ? 1 : 0
+  count = local.download_package && local.is_tarz ? 1 : 0
   depends_on = [
     null_resource.release_pre,
-    null_resource.release_download
+    null_resource.release_copy
   ]
 
   triggers = {
@@ -260,10 +255,10 @@ resource "null_resource" "uncompress_tar_z" {
 }
 
 resource "null_resource" "uncompress_tar_gz" {
-  count = (local.download_package && local.is_targz && !var.github_package) ? 1 : 0
+  count = local.download_package && local.is_targz ? 1 : 0
   depends_on = [
     null_resource.release_pre,
-    null_resource.release_download
+    null_resource.release_copy
   ]
 
   triggers = {
@@ -284,10 +279,10 @@ resource "null_resource" "uncompress_tar_gz" {
 }
 
 resource "null_resource" "uncompress_tar_bz" {
-  count = (local.download_package && local.is_tarbz && !var.github_package) ? 1 : 0
+  count = local.download_package && local.is_tarbz ? 1 : 0
   depends_on = [
     null_resource.release_pre,
-    null_resource.release_download
+    null_resource.release_copy
   ]
 
   triggers = {
@@ -310,15 +305,13 @@ resource "null_resource" "uncompress_tar_bz" {
 resource "null_resource" "release_extra_build" {
   count = var.extra_run_command != "" ? 1 : 0
   depends_on = [
-    null_resource.release_download,
+    null_resource.release_copy,
+    null_resource.release_copy_java,
     null_resource.uncompress_tar,
     null_resource.uncompress_zip,
     null_resource.uncompress_tar_z,
     null_resource.uncompress_tar_bz,
     null_resource.uncompress_tar_gz,
-    null_resource.release_download_java,
-    null_resource.release_download_gh_java,
-    null_resource.release_download_gh_node,
     null_resource.release_conf_copy_node,
     null_resource.release_conf_copy,
   ]

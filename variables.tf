@@ -64,6 +64,11 @@ variable "bluegreen_identifier" {
   nullable    = false
 }
 
+variable "release_folder" {
+  type        = string
+  description = "(required) Location [root relative] of the release source. usually ./target/ folder"
+}
+
 variable "config_source_folder" {
   type        = string
   description = "(required) Location [root relative] of the configuration source."
@@ -78,12 +83,6 @@ variable "extra_tags" {
   type        = map(string)
   description = "(optional) Extra tags to be added to the resources"
   default     = {}
-}
-
-variable "github_package" {
-  type        = bool
-  description = "(optional) Indicates if the source is a github package"
-  default     = false
 }
 
 variable "package_name" {
