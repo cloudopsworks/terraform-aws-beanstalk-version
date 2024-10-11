@@ -4,10 +4,10 @@
 #            Distributed Under Apache v2.0 License
 #
 locals {
+  root_path       = startswith(var.config_source_folder, "/") ? "" : "${path.root}/"
   config_file_sha = upper(substr(split(" ", file("${local.root_path}${var.config_hash_file}"))[0], 0, 10))
   bucket_path     = "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}.zip"
   version_label   = "${var.release_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}"
-  root_path       = startswith(var.config_source_folder, "/") ? "" : "${path.root}/"
 }
 
 resource "aws_elastic_beanstalk_application_version" "app_version" {
