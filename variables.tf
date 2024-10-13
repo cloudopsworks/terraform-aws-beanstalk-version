@@ -35,11 +35,6 @@ variable "beanstalk_application" {
   description = "(Required) Elastic Beanstalk Application Name, should already exist."
 }
 
-variable "config_source_folder" {
-  type        = string
-  description = "(required) Location [root relative] of the configuration source."
-}
-
 variable "config_file_sha" {
   type        = string
   description = "(required) SHA of the configuration file"
@@ -48,11 +43,6 @@ variable "config_file_sha" {
 variable "version_label" {
   type        = string
   description = "(required) Version label for the application"
-}
-
-variable "config_hash_file" {
-  type        = string
-  description = "(required) Hashfile location to track source "
 }
 
 variable "extra_tags" {
