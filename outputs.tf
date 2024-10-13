@@ -8,5 +8,5 @@ output "application_version_label" {
 }
 
 output "application_version_path" {
-  value = local.bucket_path
+  value = var.bucket_path
 }
