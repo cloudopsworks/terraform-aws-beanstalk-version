@@ -40,6 +40,16 @@ variable "config_source_folder" {
   description = "(required) Location [root relative] of the configuration source."
 }
 
+variable "config_file_sha" {
+  type        = string
+  description = "(required) SHA of the configuration file"
+}
+
+variable "version_label" {
+  type        = string
+  description = "(required) Version label for the application"
+}
+
 variable "config_hash_file" {
   type        = string
   description = "(required) Hashfile location to track source "

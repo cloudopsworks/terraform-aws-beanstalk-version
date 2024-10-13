@@ -4,16 +4,12 @@
 #            Distributed Under Apache v2.0 License
 #
 locals {
-  root_path       = startswith(var.config_source_folder, "/") ? "" : "${path.root}/"
-  config_file_sha = upper(substr(split(" ", file("${local.root_path}${var.config_hash_file}"))[0], 0, 10))
-  #bucket_path     = "${var.release_name}/${var.source_version}/${var.source_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}.zip"
-  version_label = "${var.release_name}-${var.source_version}-${var.namespace}-${local.config_file_sha}"
 }
 
 resource "aws_elastic_beanstalk_application_version" "app_version" {
-  name         = local.version_label
+  name         = var.version_label
   application  = data.aws_elastic_beanstalk_application.application.name
-  description  = "Application ${var.source_name} v${var.source_version} for ${var.namespace} Environment, Config SHA: ${local.config_file_sha}"
+  description  = "Application ${var.source_name} v${var.source_version} for ${var.namespace} Environment, Config SHA: ${var.config_file_sha}"
   force_delete = false
   bucket       = var.application_versions_bucket
   key          = var.bucket_path
@@ -26,6 +22,6 @@ resource "aws_elastic_beanstalk_application_version" "app_version" {
     Namespace   = var.namespace
     Application = var.source_name
     Version     = var.source_version
-    ConfigSHA   = local.config_file_sha
+    ConfigSHA   = var.config_file_sha
   })
 }
