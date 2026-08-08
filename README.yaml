@@ -22,17 +22,17 @@ description: |-
   It preserves the versions uploaded to S3.
 
 # Introduction to the project
-#introduction: |-
+introduction: |-
 #  This is an introduction.
 
 # How to use this project
-#usage: |-
+usage: |-
 
 # Example usage
-#examples: |-
+examples: |-
 
 # How to get started quickly
-#quickstart: |-
+quickstart: |-
 
 #Uncomment to include terraform generated docs (optional)
 include:
