@@ -3,9 +3,17 @@
 #            On GitHub: https://github.com/cloudopsworks
 #            Distributed Under Apache v2.0 License
 #
-name: Terraorm AWS Beanstalk Version Generator
+name: Terraform AWS Elastic Beanstalk Application Version
 
 #logo: logo/logo.jpg
+
+badges:
+  - name: Latest Release
+    image: https://img.shields.io/github/release/cloudopsworks/terraform-aws-beanstalk-version.svg?style=for-the-badge
+    url: https://github.com/cloudopsworks/terraform-aws-beanstalk-version/releases/latest
+  - name: Last Updated
+    image: https://img.shields.io/github/last-commit/cloudopsworks/terraform-aws-beanstalk-version.svg?style=for-the-badge
+    url: https://github.com/cloudopsworks/terraform-aws-beanstalk-version/commits
 
 license: "APACHE2"
 
@@ -16,23 +24,263 @@ copyrights:
 
 github_repo: cloudopsworks/terraform-aws-beanstalk-version
 
-
 description: |-
-  This module can create Packages and upload to Elastic Beanstalk Bucket and generates new version.
-  It preserves the versions uploaded to S3.
+  Registers a new **AWS Elastic Beanstalk Application Version** from an application bundle that
+  already lives in an S3 bucket, and tags it with the release metadata that produced it.
+
+  The module is deliberately narrow: it does **not** build, package or upload the artifact — that is
+  the job of the CI pipeline. It takes an existing `s3://<bucket>/<key>` object and turns it into an
+  immutable, addressable version label that an Elastic Beanstalk environment can be pointed at.
+  Previously uploaded versions in S3 are preserved (`force_delete = false`), so rollbacks remain
+  possible.
 
 # Introduction to the project
-#introduction: |-
-#  This is an introduction.
+introduction: |-
+  ## What this module does
+
+  Continuous delivery to Elastic Beanstalk is a two-phase operation: first an application bundle is
+  published to S3, then that bundle is *registered* against an Elastic Beanstalk application as a
+  named version. Only after registration can an environment be updated to run it.
+
+  This module owns the second phase. Given an application bundle already present in the Elastic
+  Beanstalk versions bucket, it creates an `aws_elastic_beanstalk_application_version` resource that:
+
+  | Behaviour | Detail |
+  |---|---|
+  | Looks up the target application | The Elastic Beanstalk application is read as a **data source** — it must already exist. This module never creates it. |
+  | Registers an immutable version | The version label comes from `version_label` and is expected to be unique per release. |
+  | Preserves history | `force_delete = false` means destroying the Terraform resource does **not** delete the bundle from S3, so previous releases stay available for rollback. |
+  | Replaces safely | `create_before_destroy = true` prevents a window in which no version exists. |
+  | Records provenance | A generated description plus tags carry the source application name, source version, target namespace and the SHA of the configuration file used for the release. |
+
+  ### Generated description and tags
+
+  The version description is composed automatically as:
+
+  ```text
+  Application <source_name> v<source_version> for <namespace> Environment, Config SHA: <config_file_sha>
+  ```
+
+  and the following tags are always applied on top of `extra_tags`:
+
+  | Tag | Value |
+  |---|---|
+  | `Namespace` | `namespace` |
+  | `Application` | `source_name` |
+  | `Version` | `source_version` |
+  | `ConfigSHA` | `config_file_sha` |
+
+  Because `extra_tags` is merged **first**, these four keys always win over anything inherited from
+  the Terragrunt tag hierarchy. Use them as the canonical provenance of a deployed release.
+
+  ## Prerequisites
+
+  Everything this module consumes must already exist:
+
+  - An **Elastic Beanstalk application** matching `beanstalk_application`.
+  - An **S3 bucket** (`application_versions_bucket`) reachable by the executing role.
+  - The **application bundle** already uploaded at `bucket_path` inside that bucket.
+  - Credentials able to call `elasticbeanstalk:CreateApplicationVersion` and read the bundle.
+
+  ## What it deliberately does not do
+
+  - It does not build, compress, download or upload artifacts.
+  - It does not create the Elastic Beanstalk application, the S3 bucket or any environment.
+  - It does not update a running environment to the new version — pair it with the environment
+    module for that step.
 
 # How to use this project
-#usage: |-
+usage: |-
+  This module is consumed through **Terragrunt**. Use the built-in `scaffold` command to bootstrap a
+  deployment directory; it sources `.boilerplate/boilerplate.yml` and generates `terragrunt.hcl`,
+  `inputs.yaml` and `local-tags.json` for you.
+
+  See the official reference: <https://docs.terragrunt.com/reference/cli/commands/scaffold>
+
+  ### 1. Scaffold the deployment
+
+  ```sh
+  # 1. Create and enter the target deployment directory
+  mkdir -p prod/us-east-1/apps/beanstalk-version
+  cd prod/us-east-1/apps/beanstalk-version
+
+  # 2. Scaffold the module (do NOT use --working-dir)
+  terragrunt scaffold github.com/cloudopsworks/terraform-aws-beanstalk-version
+
+  # 3. Edit inputs.yaml with deployment-specific values
+  #    (all keys and comments are pre-populated from .boilerplate/inputs.yaml)
+  vi inputs.yaml
+
+  # 4. Apply
+  terragrunt apply
+  ```
+
+  ### 2. Fill in `inputs.yaml`
+
+  The scaffolded `inputs.yaml` mirrors `.boilerplate/inputs.yaml`. Every key below is a module
+  variable; the Terragrunt hierarchy supplies `org`, `spoke_def`, `is_hub` and `extra_tags`
+  automatically, so they never appear here.
+
+  ```yaml
+  # Module configuration - AWS Elastic Beanstalk Application Version
+
+  # Provider / assume-role settings
+  region: "us-east-1"                                  # (Optional) AWS region used by the provider. Default: "us-east-1".
+  sts_assume_role: "arn:aws:iam::123456789012:role/deployer"
+                                                       # (Required) IAM role ARN assumed to register the application version.
+
+  # Target Elastic Beanstalk application (must already exist)
+  beanstalk_application: "my-payments-api"             # (Required) Name of the existing Elastic Beanstalk application. Looked up as a data source.
+  namespace: "prod"                                    # (Required) Namespace determining environment naming. Emitted as the `Namespace` tag. e.g. dev | qa | staging | prod.
+
+  # Artifact location - the bundle must already be uploaded to S3
+  application_versions_bucket: "my-org-eb-versions"    # (Required) S3 bucket holding Elastic Beanstalk application bundles.
+  bucket_path: "payments-api/1.4.2/payments-api-1.4.2.zip"
+                                                       # (Required) S3 key of the bundle inside the bucket. No leading slash.
+
+  # Release identity
+  version_label: "payments-api-1.4.2-prod"             # (Required) Unique version label registered in Elastic Beanstalk. Must not collide with an existing label.
+  release_name: "payments-api-1.4.2"                   # (Required) Release name of the delivery pipeline run that produced the bundle.
+  source_name: "payments-api"                          # (Required) Source application name. Emitted as the `Application` tag and in the version description.
+  source_version: "1.4.2"                              # (Required) Source application version. Emitted as the `Version` tag and in the version description.
+  config_file_sha: "9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1"  # (Required) SHA of the configuration file used for this release. Emitted as the `ConfigSHA` tag; change it to force a new version registration.
+  ```
+
+  ### 3. The generated `terragrunt.hcl`
+
+  Scaffold produces the file below — do not hand-author it. Note how `inputs.yaml` is loaded as
+  `local.local_vars` and each module variable is wired into the `inputs` block, while tags are
+  merged from the whole hierarchy into `extra_tags`.
+
+  ```hcl
+  locals {
+    local_vars  = yamldecode(file("./inputs.yaml"))
+    spoke_vars  = yamldecode(file(find_in_parent_folders("spoke-inputs.yaml")))
+    region_vars = yamldecode(file(find_in_parent_folders("region-inputs.yaml")))
+    env_vars    = yamldecode(file(find_in_parent_folders("env-inputs.yaml")))
+    global_vars = yamldecode(file(find_in_parent_folders("global-inputs.yaml")))
+
+    local_tags  = jsondecode(file("./local-tags.json"))
+    spoke_tags  = jsondecode(file(find_in_parent_folders("spoke-tags.json")))
+    region_tags = jsondecode(file(find_in_parent_folders("region-tags.json")))
+    env_tags    = jsondecode(file(find_in_parent_folders("env-tags.json")))
+    global_tags = jsondecode(file(find_in_parent_folders("global-tags.json")))
+
+    tags = merge(
+      local.global_tags,
+      local.env_tags,
+      local.region_tags,
+      local.spoke_tags,
+      local.local_tags
+    )
+  }
+
+  include "root" {
+    path = find_in_parent_folders("root.hcl")
+  }
+
+  terraform {
+    source = "github.com/cloudopsworks/terraform-aws-beanstalk-version?ref=v1.5.0"
+  }
+
+  inputs = {
+    application_versions_bucket = local.local_vars.application_versions_bucket
+    beanstalk_application       = local.local_vars.beanstalk_application
+    bucket_path                 = local.local_vars.bucket_path
+    config_file_sha             = local.local_vars.config_file_sha
+    namespace                   = local.local_vars.namespace
+    release_name                = local.local_vars.release_name
+    source_name                 = local.local_vars.source_name
+    source_version              = local.local_vars.source_version
+    sts_assume_role             = local.local_vars.sts_assume_role
+    version_label               = local.local_vars.version_label
+    region                      = try(local.local_vars.region, "us-east-1")
+    extra_tags                  = local.tags
+  }
+  ```
+
+  ### 4. Consume the outputs
+
+  | Output | Use it for |
+  |---|---|
+  | `application_version_label` | Feed into the Elastic Beanstalk environment module as the version to deploy. |
+  | `application_version_path` | The S3 key of the registered bundle, useful for audit trails and rollback tooling. |
+
+  ```hcl
+  dependency "app_version" {
+    config_path = "../beanstalk-version"
+  }
+
+  inputs = {
+    version_label = dependency.app_version.outputs.application_version_label
+  }
+  ```
 
 # Example usage
-#examples: |-
+examples: |-
+  ### Registering a new release from a CI pipeline
+
+  The pipeline uploads `payments-api-1.4.2.zip` to `s3://my-org-eb-versions/payments-api/1.4.2/`,
+  then renders `inputs.yaml` with the release coordinates and runs `terragrunt apply`:
+
+  ```yaml
+  region: "us-east-1"
+  sts_assume_role: "arn:aws:iam::123456789012:role/deployer"
+  beanstalk_application: "my-payments-api"
+  namespace: "prod"
+  application_versions_bucket: "my-org-eb-versions"
+  bucket_path: "payments-api/1.4.2/payments-api-1.4.2.zip"
+  version_label: "payments-api-1.4.2-prod"
+  release_name: "payments-api-1.4.2"
+  source_name: "payments-api"
+  source_version: "1.4.2"
+  config_file_sha: "9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1"
+  ```
+
+  The registered version carries the description
+  `Application payments-api v1.4.2 for prod Environment, Config SHA: 9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1`
+  and the tags `Namespace=prod`, `Application=payments-api`, `Version=1.4.2`,
+  `ConfigSHA=9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1`.
+
+  ### Promoting the same artifact across environments
+
+  Register the *same* S3 bundle once per namespace with distinct version labels. Each namespace gets
+  its own deployment directory and its own `inputs.yaml`, differing only in `namespace` and
+  `version_label`:
+
+  ```text
+  qa/us-east-1/apps/beanstalk-version/inputs.yaml    -> namespace: qa,   version_label: payments-api-1.4.2-qa
+  prod/us-east-1/apps/beanstalk-version/inputs.yaml  -> namespace: prod, version_label: payments-api-1.4.2-prod
+  ```
+
+  `bucket_path`, `source_name` and `source_version` stay identical, which guarantees the exact same
+  bytes are promoted — only the Elastic Beanstalk version label and provenance tags change.
+
+  ### Forcing re-registration on a configuration change
+
+  `config_file_sha` is part of both the description and the tag set. When only the configuration
+  changes but the artifact does not, bump `config_file_sha` together with `version_label` to obtain a
+  fresh, traceable application version pointing at the same bundle.
 
 # How to get started quickly
-#quickstart: |-
+quickstart: |-
+  1. Make sure the Elastic Beanstalk application, the S3 versions bucket and the uploaded bundle all
+     exist, and that your role can call `elasticbeanstalk:CreateApplicationVersion`.
+  2. Create the deployment directory and scaffold it:
+     ```sh
+     mkdir -p prod/us-east-1/apps/beanstalk-version
+     cd prod/us-east-1/apps/beanstalk-version
+     terragrunt scaffold github.com/cloudopsworks/terraform-aws-beanstalk-version
+     ```
+  3. Edit `inputs.yaml` — at minimum `beanstalk_application`, `application_versions_bucket`,
+     `bucket_path`, `version_label`, `namespace`, `source_name`, `source_version`, `release_name`,
+     `config_file_sha` and `sts_assume_role`.
+  4. Review and apply:
+     ```sh
+     terragrunt plan
+     terragrunt apply
+     ```
+  5. Wire `application_version_label` into your Elastic Beanstalk environment to deploy the release.
 
 #Uncomment to include terraform generated docs (optional)
 include:

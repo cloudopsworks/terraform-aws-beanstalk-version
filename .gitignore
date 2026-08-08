@@ -1,3 +1,4 @@
+# BEGIN TRONADOR TEMPLATE MANAGED BLOCK
 # Local .terraform directories
 **/.terraform/*
 
@@ -24,15 +25,21 @@ override.tf.json
 # Include override files you do wish to add to version control using negated pattern
 #
 # !example_override.tf
-
+.tronador
+.tronador*.mk
+tronador/
 # Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
 # example: *tfplan*
+.idea/
 
-## Tronador excludes
-.tronador
-tronador/
+provider.temp.tf
 .terraform.lock.hcl
 
-## Idea
-.idea/
-*.iml
+# AI excludes
+.claude/
+.ai/
+.omc/
+.omx/
+.gstack/
+.opencode/
+# END TRONADOR TEMPLATE MANAGED BLOCK

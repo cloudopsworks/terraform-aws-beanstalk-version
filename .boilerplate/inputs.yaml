@@ -1,0 +1,42 @@
+# Module configuration - AWS Elastic Beanstalk Application Version
+#
+# Values supplied automatically by the Terragrunt hierarchy are intentionally absent here:
+#   is_hub      - injected by the boilerplate/template engine
+#   spoke_def   - sourced from spoke-inputs.yaml
+#   org         - sourced from env-inputs.yaml
+#   extra_tags  - built from the merged *-tags.json files
+
+# --- Provider / assume-role settings -----------------------------------------------------------
+region: "us-east-1"                 # (Optional) AWS region used by the provider. Default: "us-east-1".
+sts_assume_role: ""                 # (Required) IAM role ARN assumed to register the application version.
+                                    #            Needs elasticbeanstalk:CreateApplicationVersion and read access to the bundle.
+                                    #            e.g. "arn:aws:iam::123456789012:role/deployer"
+
+# --- Target Elastic Beanstalk application (must already exist) ---------------------------------
+beanstalk_application: ""           # (Required) Name of the existing Elastic Beanstalk application.
+                                    #            Read as a data source - this module never creates it.
+                                    #            e.g. "my-payments-api"
+namespace: ""                       # (Required) Namespace that determines the environment naming.
+                                    #            Emitted as the `Namespace` tag and used in the version description.
+                                    #            e.g. dev | qa | staging | prod
+
+# --- Artifact location - the bundle must already be uploaded to S3 -----------------------------
+application_versions_bucket: ""     # (Required) S3 bucket holding Elastic Beanstalk application bundles.
+                                    #            e.g. "my-org-eb-versions"
+bucket_path: ""                     # (Required) S3 key of the bundle inside the bucket. No leading slash.
+                                    #            e.g. "payments-api/1.4.2/payments-api-1.4.2.zip"
+
+# --- Release identity ---------------------------------------------------------------------------
+version_label: ""                   # (Required) Unique version label registered in Elastic Beanstalk.
+                                    #            Must not collide with an already registered label.
+                                    #            e.g. "payments-api-1.4.2-prod"
+release_name: ""                    # (Required) Release name of the delivery pipeline run that produced the bundle.
+                                    #            e.g. "payments-api-1.4.2"
+source_name: ""                     # (Required) Source application name. Emitted as the `Application` tag
+                                    #            and used in the version description. e.g. "payments-api"
+source_version: ""                  # (Required) Source application version. Emitted as the `Version` tag
+                                    #            and used in the version description. e.g. "1.4.2"
+config_file_sha: ""                 # (Required) SHA of the configuration file used for this release.
+                                    #            Emitted as the `ConfigSHA` tag; change it together with
+                                    #            version_label to force a new version registration.
+                                    #            e.g. "9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1"
