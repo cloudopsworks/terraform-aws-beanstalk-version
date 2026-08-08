@@ -8,30 +8,31 @@
   -->
 [![README Header][readme_header_img]][readme_header_link]
 
-[![cloudopsworks][logo]](https://cloudops.works/)
+[![cloudopsworks][logo]](https://cloudopsworks.co/)
 
-# Terraorm AWS Beanstalk Version Generator
+# Terraform AWS Elastic Beanstalk Application Version
+
+ [![Latest Release](https://img.shields.io/github/release/cloudopsworks/terraform-aws-beanstalk-version.svg?style=for-the-badge)](https://github.com/cloudopsworks/terraform-aws-beanstalk-version/releases/latest) [![Last Updated](https://img.shields.io/github/last-commit/cloudopsworks/terraform-aws-beanstalk-version.svg?style=for-the-badge)](https://github.com/cloudopsworks/terraform-aws-beanstalk-version/commits)
 
 
+Registers a new **AWS Elastic Beanstalk Application Version** from an application bundle that
+already lives in an S3 bucket, and tags it with the release metadata that produced it.
 
-
-This module can create Packages and upload to Elastic Beanstalk Bucket and generates new version.
-It preserves the versions uploaded to S3.
+The module is deliberately narrow: it does **not** build, package or upload the artifact — that is
+the job of the CI pipeline. It takes an existing `s3://<bucket>/<key>` object and turns it into an
+immutable, addressable version label that an Elastic Beanstalk environment can be pointed at.
+Previously uploaded versions in S3 are preserved (`force_delete = false`), so rollbacks remain
+possible.
 
 
 ---
 
 This project is part of our comprehensive approach towards DevOps Acceleration. 
 [<img align="right" title="Share via Email" width="24" height="24" src="https://docs.cloudops.works/images/ionicons/ios-mail.svg"/>][share_email]
-[<img align="right" title="Share on Google+" width="24" height="24" src="https://docs.cloudops.works/images/ionicons/logo-googleplus.svg" />][share_googleplus]
 [<img align="right" title="Share on Facebook" width="24" height="24" src="https://docs.cloudops.works/images/ionicons/logo-facebook.svg" />][share_facebook]
 [<img align="right" title="Share on Reddit" width="24" height="24" src="https://docs.cloudops.works/images/ionicons/logo-reddit.svg" />][share_reddit]
 [<img align="right" title="Share on LinkedIn" width="24" height="24" src="https://docs.cloudops.works/images/ionicons/logo-linkedin.svg" />][share_linkedin]
-[<img align="right" title="Share on Twitter" width="24" height="24" src="https://docs.cloudops.works/images/ionicons/logo-twitter.svg" />][share_twitter]
-
-
-[![Terraform Open Source Modules](https://docs.cloudops.works/images/terraform-open-source-modules.svg)][terraform_modules]
-
+[<img align="right" title="Share on X" width="24" height="24" src="https://docs.cloudops.works/images/ionicons/logo-twitter.svg" />][share_twitter]
 
 
 It's 100% Open Source and licensed under the [APACHE2](LICENSE).
@@ -42,17 +43,266 @@ It's 100% Open Source and licensed under the [APACHE2](LICENSE).
 
 
 
-We literally have [*hundreds of terraform modules*][terraform_modules] that are Open Source and well-maintained. Check them out! 
+We have [*lots of terraform modules*][terraform_modules] that are Open Source and we are trying to get them well-maintained!. Check them out!
 
 
 
 
 
 
+## Introduction
+
+## What this module does
+
+Continuous delivery to Elastic Beanstalk is a two-phase operation: first an application bundle is
+published to S3, then that bundle is *registered* against an Elastic Beanstalk application as a
+named version. Only after registration can an environment be updated to run it.
+
+This module owns the second phase. Given an application bundle already present in the Elastic
+Beanstalk versions bucket, it creates an `aws_elastic_beanstalk_application_version` resource that:
+
+| Behaviour | Detail |
+|---|---|
+| Looks up the target application | The Elastic Beanstalk application is read as a **data source** — it must already exist. This module never creates it. |
+| Registers an immutable version | The version label comes from `version_label` and is expected to be unique per release. |
+| Preserves history | `force_delete = false` means destroying the Terraform resource does **not** delete the bundle from S3, so previous releases stay available for rollback. |
+| Replaces safely | `create_before_destroy = true` prevents a window in which no version exists. |
+| Records provenance | A generated description plus tags carry the source application name, source version, target namespace and the SHA of the configuration file used for the release. |
+
+### Generated description and tags
+
+The version description is composed automatically as:
+
+```text
+Application <source_name> v<source_version> for <namespace> Environment, Config SHA: <config_file_sha>
+```
+
+and the following tags are always applied on top of `extra_tags`:
+
+| Tag | Value |
+|---|---|
+| `Namespace` | `namespace` |
+| `Application` | `source_name` |
+| `Version` | `source_version` |
+| `ConfigSHA` | `config_file_sha` |
+
+Because `extra_tags` is merged **first**, these four keys always win over anything inherited from
+the Terragrunt tag hierarchy. Use them as the canonical provenance of a deployed release.
+
+## Prerequisites
+
+Everything this module consumes must already exist:
+
+- An **Elastic Beanstalk application** matching `beanstalk_application`.
+- An **S3 bucket** (`application_versions_bucket`) reachable by the executing role.
+- The **application bundle** already uploaded at `bucket_path` inside that bucket.
+- Credentials able to call `elasticbeanstalk:CreateApplicationVersion` and read the bundle.
+
+## What it deliberately does not do
+
+- It does not build, compress, download or upload artifacts.
+- It does not create the Elastic Beanstalk application, the S3 bucket or any environment.
+- It does not update a running environment to the new version — pair it with the environment
+  module for that step.
+
+## Usage
 
 
+**IMPORTANT:** The `master` branch is used in `source` just as an example. In your code, do not pin to `master` because there may be breaking changes between releases.
+Instead pin to the release tag (e.g. `?ref=vX.Y.Z`) of one of our [latest releases](https://github.com/cloudopsworks/terraform-aws-beanstalk-version/releases).
 
 
+This module is consumed through **Terragrunt**. Use the built-in `scaffold` command to bootstrap a
+deployment directory; it sources `.boilerplate/boilerplate.yml` and generates `terragrunt.hcl`,
+`inputs.yaml` and `local-tags.json` for you.
+
+See the official reference: <https://docs.terragrunt.com/reference/cli/commands/scaffold>
+
+### 1. Scaffold the deployment
+
+```sh
+# 1. Create and enter the target deployment directory
+mkdir -p prod/us-east-1/apps/beanstalk-version
+cd prod/us-east-1/apps/beanstalk-version
+
+# 2. Scaffold the module (do NOT use --working-dir)
+terragrunt scaffold github.com/cloudopsworks/terraform-aws-beanstalk-version
+
+# 3. Edit inputs.yaml with deployment-specific values
+#    (all keys and comments are pre-populated from .boilerplate/inputs.yaml)
+vi inputs.yaml
+
+# 4. Apply
+terragrunt apply
+```
+
+### 2. Fill in `inputs.yaml`
+
+The scaffolded `inputs.yaml` mirrors `.boilerplate/inputs.yaml`. Every key below is a module
+variable; the Terragrunt hierarchy supplies `org`, `spoke_def`, `is_hub` and `extra_tags`
+automatically, so they never appear here.
+
+```yaml
+# Module configuration - AWS Elastic Beanstalk Application Version
+
+# Provider / assume-role settings
+region: "us-east-1"                                  # (Optional) AWS region used by the provider. Default: "us-east-1".
+sts_assume_role: "arn:aws:iam::123456789012:role/deployer"
+                                                     # (Required) IAM role ARN assumed to register the application version.
+
+# Target Elastic Beanstalk application (must already exist)
+beanstalk_application: "my-payments-api"             # (Required) Name of the existing Elastic Beanstalk application. Looked up as a data source.
+namespace: "prod"                                    # (Required) Namespace determining environment naming. Emitted as the `Namespace` tag. e.g. dev | qa | staging | prod.
+
+# Artifact location - the bundle must already be uploaded to S3
+application_versions_bucket: "my-org-eb-versions"    # (Required) S3 bucket holding Elastic Beanstalk application bundles.
+bucket_path: "payments-api/1.4.2/payments-api-1.4.2.zip"
+                                                     # (Required) S3 key of the bundle inside the bucket. No leading slash.
+
+# Release identity
+version_label: "payments-api-1.4.2-prod"             # (Required) Unique version label registered in Elastic Beanstalk. Must not collide with an existing label.
+release_name: "payments-api-1.4.2"                   # (Required) Release name of the delivery pipeline run that produced the bundle.
+source_name: "payments-api"                          # (Required) Source application name. Emitted as the `Application` tag and in the version description.
+source_version: "1.4.2"                              # (Required) Source application version. Emitted as the `Version` tag and in the version description.
+config_file_sha: "9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1"  # (Required) SHA of the configuration file used for this release. Emitted as the `ConfigSHA` tag; change it to force a new version registration.
+```
+
+### 3. The generated `terragrunt.hcl`
+
+Scaffold produces the file below — do not hand-author it. Note how `inputs.yaml` is loaded as
+`local.local_vars` and each module variable is wired into the `inputs` block, while tags are
+merged from the whole hierarchy into `extra_tags`.
+
+```hcl
+locals {
+  local_vars  = yamldecode(file("./inputs.yaml"))
+  spoke_vars  = yamldecode(file(find_in_parent_folders("spoke-inputs.yaml")))
+  region_vars = yamldecode(file(find_in_parent_folders("region-inputs.yaml")))
+  env_vars    = yamldecode(file(find_in_parent_folders("env-inputs.yaml")))
+  global_vars = yamldecode(file(find_in_parent_folders("global-inputs.yaml")))
+
+  local_tags  = jsondecode(file("./local-tags.json"))
+  spoke_tags  = jsondecode(file(find_in_parent_folders("spoke-tags.json")))
+  region_tags = jsondecode(file(find_in_parent_folders("region-tags.json")))
+  env_tags    = jsondecode(file(find_in_parent_folders("env-tags.json")))
+  global_tags = jsondecode(file(find_in_parent_folders("global-tags.json")))
+
+  tags = merge(
+    local.global_tags,
+    local.env_tags,
+    local.region_tags,
+    local.spoke_tags,
+    local.local_tags
+  )
+}
+
+include "root" {
+  path = find_in_parent_folders("root.hcl")
+}
+
+terraform {
+  source = "github.com/cloudopsworks/terraform-aws-beanstalk-version?ref=v1.5.0"
+}
+
+inputs = {
+  application_versions_bucket = local.local_vars.application_versions_bucket
+  beanstalk_application       = local.local_vars.beanstalk_application
+  bucket_path                 = local.local_vars.bucket_path
+  config_file_sha             = local.local_vars.config_file_sha
+  namespace                   = local.local_vars.namespace
+  release_name                = local.local_vars.release_name
+  source_name                 = local.local_vars.source_name
+  source_version              = local.local_vars.source_version
+  sts_assume_role             = local.local_vars.sts_assume_role
+  version_label               = local.local_vars.version_label
+  region                      = try(local.local_vars.region, "us-east-1")
+  extra_tags                  = local.tags
+}
+```
+
+### 4. Consume the outputs
+
+| Output | Use it for |
+|---|---|
+| `application_version_label` | Feed into the Elastic Beanstalk environment module as the version to deploy. |
+| `application_version_path` | The S3 key of the registered bundle, useful for audit trails and rollback tooling. |
+
+```hcl
+dependency "app_version" {
+  config_path = "../beanstalk-version"
+}
+
+inputs = {
+  version_label = dependency.app_version.outputs.application_version_label
+}
+```
+
+## Quick Start
+
+1. Make sure the Elastic Beanstalk application, the S3 versions bucket and the uploaded bundle all
+   exist, and that your role can call `elasticbeanstalk:CreateApplicationVersion`.
+2. Create the deployment directory and scaffold it:
+   ```sh
+   mkdir -p prod/us-east-1/apps/beanstalk-version
+   cd prod/us-east-1/apps/beanstalk-version
+   terragrunt scaffold github.com/cloudopsworks/terraform-aws-beanstalk-version
+   ```
+3. Edit `inputs.yaml` — at minimum `beanstalk_application`, `application_versions_bucket`,
+   `bucket_path`, `version_label`, `namespace`, `source_name`, `source_version`, `release_name`,
+   `config_file_sha` and `sts_assume_role`.
+4. Review and apply:
+   ```sh
+   terragrunt plan
+   terragrunt apply
+   ```
+5. Wire `application_version_label` into your Elastic Beanstalk environment to deploy the release.
+
+
+## Examples
+
+### Registering a new release from a CI pipeline
+
+The pipeline uploads `payments-api-1.4.2.zip` to `s3://my-org-eb-versions/payments-api/1.4.2/`,
+then renders `inputs.yaml` with the release coordinates and runs `terragrunt apply`:
+
+```yaml
+region: "us-east-1"
+sts_assume_role: "arn:aws:iam::123456789012:role/deployer"
+beanstalk_application: "my-payments-api"
+namespace: "prod"
+application_versions_bucket: "my-org-eb-versions"
+bucket_path: "payments-api/1.4.2/payments-api-1.4.2.zip"
+version_label: "payments-api-1.4.2-prod"
+release_name: "payments-api-1.4.2"
+source_name: "payments-api"
+source_version: "1.4.2"
+config_file_sha: "9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1"
+```
+
+The registered version carries the description
+`Application payments-api v1.4.2 for prod Environment, Config SHA: 9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1`
+and the tags `Namespace=prod`, `Application=payments-api`, `Version=1.4.2`,
+`ConfigSHA=9f2c1b7e4a0d5c38ab61f0e2d7c4b9a1`.
+
+### Promoting the same artifact across environments
+
+Register the *same* S3 bundle once per namespace with distinct version labels. Each namespace gets
+its own deployment directory and its own `inputs.yaml`, differing only in `namespace` and
+`version_label`:
+
+```text
+qa/us-east-1/apps/beanstalk-version/inputs.yaml    -> namespace: qa,   version_label: payments-api-1.4.2-qa
+prod/us-east-1/apps/beanstalk-version/inputs.yaml  -> namespace: prod, version_label: payments-api-1.4.2-prod
+```
+
+`bucket_path`, `source_name` and `source_version` stay identical, which guarantees the exact same
+bytes are promoted — only the Elastic Beanstalk version label and provenance tags change.
+
+### Forcing re-registration on a configuration change
+
+`config_file_sha` is part of both the description and the tag set. When only the configuration
+changes but the artifact does not, bump `config_file_sha` together with `version_label` to obtain a
+fresh, traceable application version pointing at the same bundle.
 
 
 
@@ -63,7 +313,9 @@ Available targets:
   help                                Help screen
   help/all                            Display help for all targets
   help/short                          This help short screen
-  lint                                Lint terraform code
+  init/%                              Initialize the project for a specific cloud provider: %S
+  lint                                Lint terraform/opentofu code
+  tag                                 Tag the current version
 
 ```
 ## Requirements
@@ -74,10 +326,7 @@ No requirements.
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 4.9.0 |
-| <a name="provider_local"></a> [local](#provider\_local) | 2.2.2 |
-| <a name="provider_null"></a> [null](#provider\_null) | 3.1.1 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.1.2 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 5.71.0 |
 
 ## Modules
 
@@ -88,23 +337,8 @@ No modules.
 | Name | Type |
 |------|------|
 | [aws_elastic_beanstalk_application_version.app_version](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/elastic_beanstalk_application_version) | resource |
-| [local_file.awscli_results_file](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
-| [null_resource.awscli_program](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.build_package](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.release_conf_copy](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.release_conf_copy_node](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.release_download](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.release_download_java](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.release_pre](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.uncompress_tar](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.uncompress_tar_bz](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.uncompress_tar_gz](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.uncompress_tar_z](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [null_resource.uncompress_zip](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [random_string.awscli_output_temp_file_name](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_elastic_beanstalk_application.application](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/elastic_beanstalk_application) | data source |
-| [aws_s3_bucket.version_bucket](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/s3_bucket) | data source |
 
 ## Inputs
 
@@ -112,24 +346,23 @@ No modules.
 |------|-------------|------|---------|:--------:|
 | <a name="input_application_versions_bucket"></a> [application\_versions\_bucket](#input\_application\_versions\_bucket) | (Required) Application Versions bucket | `string` | n/a | yes |
 | <a name="input_beanstalk_application"></a> [beanstalk\_application](#input\_beanstalk\_application) | (Required) Elastic Beanstalk Application Name, should already exist. | `string` | n/a | yes |
-| <a name="input_force_source_compressed"></a> [force\_source\_compressed](#input\_force\_source\_compressed) | (Optional) Forces that source file should be downloaded as zip file or tar file | `bool` | `false` | no |
+| <a name="input_bucket_path"></a> [bucket\_path](#input\_bucket\_path) | (Required) Bucket path to store the application version | `string` | n/a | yes |
+| <a name="input_config_file_sha"></a> [config\_file\_sha](#input\_config\_file\_sha) | (required) SHA of the configuration file | `string` | n/a | yes |
+| <a name="input_extra_tags"></a> [extra\_tags](#input\_extra\_tags) | (optional) Extra tags to be added to the resources | `map(string)` | `{}` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | (required) namespace that determines the environment naming | `string` | n/a | yes |
-| <a name="input_region"></a> [region](#input\_region) | # (c) 2022 - Cloud Ops Works LLC - https://cloudops.works/ On GitHub: https://github.com/cloudopsworks Distributed Under Apache v2.0 License | `string` | `"us-east-1"` | no |
-| <a name="input_release_name"></a> [release\_name](#input\_release\_name) | # (c) 2022 - Cloud Ops Works LLC - https://cloudops.works/ On GitHub: https://github.com/cloudopsworks Distributed Under Apache v2.0 License | `string` | n/a | yes |
-| <a name="input_repository_owner"></a> [repository\_owner](#input\_repository\_owner) | (required) Repository onwer/team | `string` | n/a | yes |
-| <a name="input_repository_url"></a> [repository\_url](#input\_repository\_url) | (optional) repository url to pull releases. | `string` | `"https://github.com"` | no |
-| <a name="input_solution_stack"></a> [solution\_stack](#input\_solution\_stack) | (required) Specify solution stack for Elastic Beanstalk<br>Solution stack is one of:<br>  java      = \"^64bit Amazon Linux 2 (.*) Corretto 8(.*)$\"<br>  java11    = \"^64bit Amazon Linux 2 (.*) Corretto 11(.*)$\"<br>  node      = \"^64bit Amazon Linux 2 (.*) Node.js 12(.*)$\"<br>  node14    = \"^64bit Amazon Linux 2 (.*) Node.js 14(.*)$\"<br>  go        = \"^64bit Amazon Linux 2 (.*) Go (.*)$\"<br>  docker    = \"^64bit Amazon Linux 2 (.*) Docker (.*)$\"<br>  docker-m  = \"^64bit Amazon Linux 2 (.*) Multi-container Docker (.*)$\"<br>  java-amz1 = \"^64bit Amazon Linux (.*)$ running Java 8(.*)$\"<br>  node-amz1 = \"^64bit Amazon Linux (.*)$ running Node.js(.*)$\" | `string` | `"java"` | no |
-| <a name="input_source_compressed_type"></a> [source\_compressed\_type](#input\_source\_compressed\_type) | (Optional) Indicates the type of the source package to proceed with its de-compression. | `string` | `"zip"` | no |
-| <a name="input_source_name"></a> [source\_name](#input\_source\_name) | n/a | `string` | n/a | yes |
-| <a name="input_source_version"></a> [source\_version](#input\_source\_version) | n/a | `string` | n/a | yes |
-| <a name="input_sts_assume_role"></a> [sts\_assume\_role](#input\_sts\_assume\_role) | n/a | `string` | n/a | yes |
+| <a name="input_region"></a> [region](#input\_region) | (Optional) AWS region used by the provider. Default: "us-east-1" | `string` | `"us-east-1"` | no |
+| <a name="input_release_name"></a> [release\_name](#input\_release\_name) | (Required) Release name of the delivery pipeline run that produced the application bundle. e.g. "payments-api-1.4.2" | `string` | n/a | yes |
+| <a name="input_source_name"></a> [source\_name](#input\_source\_name) | (Required) Source application name, emitted as the `Application` tag and used in the version description. e.g. "payments-api" | `string` | n/a | yes |
+| <a name="input_source_version"></a> [source\_version](#input\_source\_version) | (Required) Source application version, emitted as the `Version` tag and used in the version description. e.g. "1.4.2" | `string` | n/a | yes |
+| <a name="input_sts_assume_role"></a> [sts\_assume\_role](#input\_sts\_assume\_role) | (Required) IAM role ARN assumed to register the application version. Needs elasticbeanstalk:CreateApplicationVersion and read access to the bundle. | `string` | n/a | yes |
+| <a name="input_version_label"></a> [version\_label](#input\_version\_label) | (required) Version label for the application | `string` | n/a | yes |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| <a name="output_application_version_label"></a> [application\_version\_label](#output\_application\_version\_label) | n/a |
-| <a name="output_application_version_path"></a> [application\_version\_path](#output\_application\_version\_path) | n/a |
+| <a name="output_application_version_label"></a> [application\_version\_label](#output\_application\_version\_label) | Version label of the registered Elastic Beanstalk application version. Feed this into the Elastic Beanstalk environment to deploy the release. |
+| <a name="output_application_version_path"></a> [application\_version\_path](#output\_application\_version\_path) | S3 key of the application bundle registered as this version, relative to the application versions bucket. |
 
 
 
@@ -139,31 +372,28 @@ No modules.
 
 File a GitHub [issue](https://github.com/cloudopsworks/terraform-aws-beanstalk-version/issues), send us an [email][email] or join our [Slack Community][slack].
 
-[![README Commercial Support][readme_commercial_support_img]][readme_commercial_support_link]
 
 ## DevOps Tools
+[Our Products](https://cloudopsworks.co/products/)
+[CI/CD Blueprint](https://cloudopsworks.co/cicd-blueprint/)
+[Open Source](https://cloudopsworks.co/open-source/)
 
 ## Slack Community
 
 
 ## Newsletter
-
-## Office Hours
-
-## Contributing
+[Resources Directory](https://cloudopsworks.co/resources/)
 
 ### Bug Reports & Feature Requests
 
 Please use the [issue tracker](https://github.com/cloudopsworks/terraform-aws-beanstalk-version/issues) to report any bugs or file feature requests.
-
-### Developing
 
 
 
 
 ## Copyrights
 
-Copyright © 2021-2022 [Cloud Ops Works LLC](https://cloudops.works)
+Copyright © 2021-2026 [Cloud Ops Works LLC](https://cloudops.works)
 
 
 
@@ -220,32 +450,31 @@ This project is maintained by [Cloud Ops Works LLC][website].
 [![README Footer][readme_footer_img]][readme_footer_link]
 [![Beacon][beacon]][website]
 
-  [logo]: https://cloudops.works/logo-300x69.svg
-  [docs]: https://cowk.io/docs?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=docs
-  [website]: https://cowk.io/homepage?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=website
-  [github]: https://cowk.io/github?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=github
-  [jobs]: https://cowk.io/jobs?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=jobs
-  [hire]: https://cowk.io/hire?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=hire
-  [slack]: https://cowk.io/slack?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=slack
-  [linkedin]: https://cowk.io/linkedin?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=linkedin
-  [twitter]: https://cowk.io/twitter?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=twitter
-  [testimonial]: https://cowk.io/leave-testimonial?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=testimonial
-  [office_hours]: https://cloudops.works/office-hours?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=office_hours
-  [newsletter]: https://cowk.io/newsletter?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=newsletter
-  [email]: https://cowk.io/email?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=email
-  [commercial_support]: https://cowk.io/commercial-support?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=commercial_support
-  [we_love_open_source]: https://cowk.io/we-love-open-source?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=we_love_open_source
-  [terraform_modules]: https://cowk.io/terraform-modules?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=terraform_modules
-  [readme_header_img]: https://cloudops.works/readme/header/img
-  [readme_header_link]: https://cloudops.works/readme/header/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=readme_header_link
-  [readme_footer_img]: https://cloudops.works/readme/footer/img
-  [readme_footer_link]: https://cloudops.works/readme/footer/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=readme_footer_link
-  [readme_commercial_support_img]: https://cloudops.works/readme/commercial-support/img
-  [readme_commercial_support_link]: https://cloudops.works/readme/commercial-support/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=readme_commercial_support_link
-  [share_twitter]: https://twitter.com/intent/tweet/?text=Terraorm+AWS+Beanstalk+Version+Generator&url=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
-  [share_linkedin]: https://www.linkedin.com/shareArticle?mini=true&title=Terraorm+AWS+Beanstalk+Version+Generator&url=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
+  [logo]: https://cloudopsworks.co/images/main-logo.png
+  [docs]: https://cloudopsworks.co/resources?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=docs
+  [website]: https://cloudopsworks.co?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=website
+  [github]: https://cloudopsworks.co/github?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=github
+  [jobs]: https://cloudopsworks.co/jobs?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=jobs
+  [hire]: https://cloudopsworks.co/hire?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=hire
+  [slack]: https://cloudopsworks.co/slack?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=slack
+  [linkedin]: https://cloudopsworks.co/linkedin?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=linkedin
+  [x]: https://cloudopsworks.co/x?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=x
+  [testimonial]: https://cloudopsworks.co/case-studies?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=testimonial
+  [office_hours]: https://cloudopsworks.co/office-hours?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=office_hours
+  [newsletter]: https://cloudopsworks.co/resources?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=newsletter
+  [email]: https://cloudopsworks.co/contact?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=email
+  [commercial_support]: https://cloudopsworks.co/services?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=commercial_support
+  [we_love_open_source]: https://cloudopsworks.co/open-source?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=we_love_open_source
+  [terraform_modules]: https://cloudopsworks.co/open-source?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=terraform_modules
+  [readme_header_img]: https://cloudopsworks.co/images/readme-header.png
+  [readme_header_link]: https://cloudopsworks.co/readme/header/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=readme_header_link
+  [readme_footer_img]: https://cloudopsworks.co/images/main-logo-footer.png
+  [readme_footer_link]: https://cloudopsworks.co/readme/footer/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=readme_footer_link
+  [readme_commercial_support_img]: https://cloudopsworks.co/readme/commercial-support/img
+  [readme_commercial_support_link]: https://cloudopsworks.co/readme/commercial-support/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-aws-beanstalk-version&utm_content=readme_commercial_support_link
+  [share_twitter]: https://x.com/intent/tweet/?text=Terraform+AWS+Elastic+Beanstalk+Application+Version&url=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
+  [share_linkedin]: https://www.linkedin.com/shareArticle?mini=true&title=Terraform+AWS+Elastic+Beanstalk+Application+Version&url=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
   [share_reddit]: https://reddit.com/submit/?url=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
   [share_facebook]: https://facebook.com/sharer/sharer.php?u=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
-  [share_googleplus]: https://plus.google.com/share?url=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
-  [share_email]: mailto:?subject=Terraorm+AWS+Beanstalk+Version+Generator&body=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
-  [beacon]: https://ga-beacon.cloudops.works/G-7XWMFVFXZT/cloudopsworks/terraform-aws-beanstalk-version?pixel&cs=github&cm=readme&an=terraform-aws-beanstalk-version
+  [share_email]: mailto:?subject=Terraform+AWS+Elastic+Beanstalk+Application+Version&body=https://github.com/cloudopsworks/terraform-aws-beanstalk-version
+  [beacon]: https://ga-beacon.cloudopsworks.co/G-QMZVYYN2VN/cloudopsworks/terraform-aws-beanstalk-version?pixel&cs=github&cm=readme&an=terraform-aws-beanstalk-version
